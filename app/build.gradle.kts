@@ -3,16 +3,20 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
 android {
     namespace = "com.example.csimovement"
     compileSdk = 35
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
+
     defaultConfig {
         applicationId = "com.example.csimovement"
         minSdk = 23
@@ -20,7 +24,17 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+
+    // Keep Java and Kotlin compilation targets consistent on GitHub Actions.
+    tasks.withType<JavaCompile>().configureEach {
+        options.release.set(17)
+    }
 }
+
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.10.1")
