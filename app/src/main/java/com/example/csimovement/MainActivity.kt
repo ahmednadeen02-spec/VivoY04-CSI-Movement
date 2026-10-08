@@ -56,6 +56,9 @@ fun CsiApp() {
 
     fun startTest() {
         job?.cancel()
+        samples.clear()
+        score = 0f
+        movement = false
         running = true
         source = "Demo CSI signal"
         status = "CALIBRATING..."
@@ -80,6 +83,8 @@ fun CsiApp() {
         job?.cancel()
         job = null
         running = false
+        movement = false
+        score = 0f
         status = "STOPPED"
         source = "No signal"
     }
@@ -87,6 +92,8 @@ fun CsiApp() {
     fun startUdp() {
         job?.cancel()
         samples.clear()
+        score = 0f
+        movement = false
         running = true
         source = "ESP32 CSI / UDP 5005"
         status = "LISTENING"
@@ -140,7 +147,7 @@ fun CsiApp() {
                                 color = if (movement) Color(0xFFC62828) else Color(0xFF2E7D32)
                             )
                             Spacer(Modifier.weight(1f))
-                            Text("\${(score * 100).toInt()}%", fontWeight = FontWeight.Bold)
+                            Text("${(score * 100).toInt()}%", fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(5.dp))
                         Text(if (movement) "Body movement detected" else "No significant movement")
