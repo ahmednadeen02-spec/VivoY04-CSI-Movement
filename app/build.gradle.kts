@@ -24,11 +24,6 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
-
-    // Keep Java and Kotlin compilation targets consistent on GitHub Actions.
-    tasks.withType<JavaCompile>().configureEach {
-        options.release.set(17)
-    }
 }
 
 
