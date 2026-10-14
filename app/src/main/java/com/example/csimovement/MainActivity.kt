@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -272,6 +273,17 @@ private fun RadarPanel(
     samples: List<Float>,
     signalDbm: Int
 ) {
+    val radarAnimation = rememberInfiniteTransition(label = "radar-scan")
+    val scanPhase by radarAnimation.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "scan-phase"
+    )
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -280,73 +292,142 @@ private fun RadarPanel(
         Canvas(Modifier.fillMaxSize().padding(6.dp)) {
             val w = size.width
             val h = size.height
-            val bodyX = w * 0.48f
-            val bodyY = h * 0.50f
-            val maxR = min(w, h) * 0.44f
-
-            drawRect(Color(0xFF071A2B), size = Size(w, h))
-
-            for (i in 1..5) {
-                val r = maxR * i / 5f
-                drawCircle(Color(0xFF16466F), r, Offset(bodyX, bodyY), style = Stroke(width = 1.2f))
-            }
-            for (i in -3..3) {
-                val x = w * (i + 3) / 6f
-                drawLine(Color(0xFF123653), Offset(x, 0f), Offset(x, h), 1f)
-            }
-            for (i in -2..2) {
-                val y = h * (i + 2) / 4f
-                drawLine(Color(0xFF123653), Offset(0f, y), Offset(w, y), 1f)
-            }
-
+            val bodyX = w * 0.50f
+            val bodyY = h * 0.43f
+            val maxR = min(w * 0.40f, h * 0.34f)
             val waveColor = if (movement) Red else Cyan
-            for (i in 1..4) {
-                val r = maxR * (0.25f + i * 0.14f)
-                drawArc(waveColor.copy(alpha = 0.65f), -55f, 110f, false,
-                    Offset(bodyX - r, bodyY - r), Size(r * 2, r * 2), style = Stroke(width = 2.5f))
+
+            drawRect(Color(0xFF04101F), size = Size(w, h))
+
+            // CCTV-like grid and corner markers
+            for (i in 0..8) {
+                val x = w * i / 8f
+                drawLine(Color(0xFF102B43), Offset(x, 0f), Offset(x, h), 1f)
+            }
+            for (i in 0..6) {
+                val y = h * i / 6f
+                drawLine(Color(0xFF102B43), Offset(0f, y), Offset(w, y), 1f)
+            }
+            val corner = 18f
+            val inset = 10f
+            val marker = Color(0xFF2A91C9)
+            drawLine(marker, Offset(inset, inset), Offset(inset + corner, inset), 2.5f)
+            drawLine(marker, Offset(inset, inset), Offset(inset, inset + corner), 2.5f)
+            drawLine(marker, Offset(w - inset, inset), Offset(w - inset - corner, inset), 2.5f)
+            drawLine(marker, Offset(w - inset, inset), Offset(w - inset, inset + corner), 2.5f)
+            drawLine(marker, Offset(inset, h - inset), Offset(inset + corner, h - inset), 2.5f)
+            drawLine(marker, Offset(inset, h - inset), Offset(inset, h - inset - corner), 2.5f)
+            drawLine(marker, Offset(w - inset, h - inset), Offset(w - inset - corner, h - inset), 2.5f)
+            drawLine(marker, Offset(w - inset, h - inset), Offset(w - inset, h - inset - corner), 2.5f)
+
+            // Radar rings and animated sweep
+            for (i in 1..5) {
+                drawCircle(
+                    Color(0xFF1C5275).copy(alpha = 0.85f - i * 0.09f),
+                    maxR * i / 5f,
+                    Offset(bodyX, bodyY),
+                    style = Stroke(width = 1.25f)
+                )
+            }
+            val sweepAngle = scanPhase * 360f
+            drawArc(
+                brush = Brush.sweepGradient(
+                    listOf(Color.Transparent, Color(0x4430C8FF), Color(0x8830C8FF)),
+                    center = Offset(bodyX, bodyY)
+                ),
+                startAngle = sweepAngle,
+                sweepAngle = 48f,
+                useCenter = true,
+                topLeft = Offset(bodyX - maxR, bodyY - maxR),
+                size = Size(maxR * 2f, maxR * 2f)
+            )
+            val rayAngle = Math.toRadians(sweepAngle.toDouble())
+            drawLine(
+                Color(0xFF36D8FF).copy(alpha = 0.9f),
+                Offset(bodyX, bodyY),
+                Offset(bodyX + cos(rayAngle).toFloat() * maxR, bodyY + sin(rayAngle).toFloat() * maxR),
+                2f
+            )
+
+            // CSI-derived heatmap estimate, not a camera image
+            val heatAlpha = (0.10f + score.coerceIn(0f, 1f) * 0.42f).coerceIn(0.10f, 0.52f)
+            val heatColor = if (movement) Color(0xFFFF3D5A) else Color(0xFF00D9FF)
+            drawCircle(heatColor.copy(alpha = heatAlpha * 0.24f), maxR * 0.70f, Offset(bodyX, bodyY))
+            drawCircle(heatColor.copy(alpha = heatAlpha * 0.34f), maxR * 0.47f, Offset(bodyX, bodyY))
+            drawCircle(heatColor.copy(alpha = heatAlpha * 0.44f), maxR * 0.24f, Offset(bodyX, bodyY))
+
+            // Stylized human-shaped estimate and tracking box
+            val boxW = w * 0.20f
+            val boxH = h * 0.40f
+            val boxTop = bodyY - h * 0.24f
+            drawRoundRect(
+                color = waveColor.copy(alpha = if (movement) 0.95f else 0.52f),
+                topLeft = Offset(bodyX - boxW / 2f, boxTop),
+                size = Size(boxW, boxH),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f),
+                style = Stroke(width = if (movement) 2.5f else 1.5f)
+            )
+            val head = Offset(bodyX, bodyY - h * 0.14f)
+            val headR = h * 0.035f
+            drawCircle(Color(0xFF06111E), headR, head)
+            drawCircle(waveColor, headR, head, style = Stroke(width = 2.5f))
+            val shoulderY = bodyY - h * 0.06f
+            val hipY = bodyY + h * 0.10f
+            drawLine(waveColor, Offset(bodyX, shoulderY), Offset(bodyX, hipY), h * 0.022f, cap = StrokeCap.Round)
+            drawLine(waveColor, Offset(bodyX, shoulderY), Offset(bodyX - w * 0.065f, bodyY + h * 0.025f), h * 0.018f, cap = StrokeCap.Round)
+            drawLine(waveColor, Offset(bodyX, shoulderY), Offset(bodyX + w * 0.065f, bodyY + h * 0.025f), h * 0.018f, cap = StrokeCap.Round)
+            drawLine(waveColor, Offset(bodyX, hipY), Offset(bodyX - w * 0.055f, bodyY + h * 0.19f), h * 0.021f, cap = StrokeCap.Round)
+            drawLine(waveColor, Offset(bodyX, hipY), Offset(bodyX + w * 0.055f, bodyY + h * 0.19f), h * 0.021f, cap = StrokeCap.Round)
+
+            // Recent sample trail
+            if (samples.size > 8) {
+                val trailCount = min(10, samples.size)
+                val sampleMin = samples.minOrNull() ?: 0f
+                val sampleMax = max(sampleMin + 0.01f, samples.maxOrNull() ?: 1f)
+                for (i in 0 until trailCount) {
+                    val sample = samples[samples.size - trailCount + i]
+                    val spread = ((sample - sampleMin) / (sampleMax - sampleMin)).coerceIn(0f, 1f)
+                    val fraction = i / (trailCount - 1f)
+                    val tx = bodyX - maxR * 0.75f + fraction * maxR * 1.5f
+                    val ty = bodyY + maxR * 0.63f - spread * maxR * 0.38f
+                    drawCircle(
+                        Color(0xFF4CE6FF).copy(alpha = 0.18f + fraction * 0.72f),
+                        2.5f + spread * 2f,
+                        Offset(tx, ty)
+                    )
+                }
             }
 
-            val glow = 35f + score * 65f
-            if (movement) {
-                drawCircle(Color(0x44FF4250), glow, Offset(bodyX, bodyY))
-                drawCircle(Color(0x2255FFCC), glow * 1.5f, Offset(bodyX, bodyY))
-            }
-
-            val head = Offset(bodyX, bodyY - h * .19f)
-            drawCircle(Color(0xFF0B0F16), h * .055f, head)
-            drawCircle(waveColor, h * .055f, head, style = Stroke(width = 3f))
-
-            val shoulderY = bodyY - h * .08f
-            val hipY = bodyY + h * .14f
-            drawLine(waveColor, Offset(bodyX, shoulderY), Offset(bodyX, hipY), h * .045f, cap = StrokeCap.Round)
-            drawLine(waveColor, Offset(bodyX, shoulderY), Offset(bodyX - w*.10f, bodyY + h*.03f), h*.032f, cap = StrokeCap.Round)
-            drawLine(waveColor, Offset(bodyX, shoulderY), Offset(bodyX + w*.10f, bodyY + h*.03f), h*.032f, cap = StrokeCap.Round)
-            drawLine(waveColor, Offset(bodyX, hipY), Offset(bodyX - w*.075f, bodyY + h*.29f), h*.04f, cap = StrokeCap.Round)
-            drawLine(waveColor, Offset(bodyX, hipY), Offset(bodyX + w*.075f, bodyY + h*.29f), h*.04f, cap = StrokeCap.Round)
-
-            if (movement) {
-                val pulse = 1f + 0.12f * sin(System.currentTimeMillis() / 180.0).toFloat()
-                drawCircle(Red, 7f * pulse, Offset(bodyX, bodyY + h*.31f))
-            }
-
-            TextOnCanvas("DETECTION ZONE", Offset(14f, 22f), TextMain)
-            TextOnCanvas("3.0m x 3.0m", Offset(14f, 42f), TextDim)
-            TextOnCanvas(if (movement) "● PERSON" else "● SCANNING", Offset(w - 105f, 22f), if (movement) Red else Green)
-            TextOnCanvas("$signalDbm dBm", Offset(w - 105f, 42f), TextDim)
-
+            // Live CSI waveform strip
+            val chartTop = h * 0.76f
+            drawRoundRect(
+                color = Color(0xAA061528),
+                topLeft = Offset(8f, chartTop),
+                size = Size(w - 16f, h * 0.18f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+            )
             if (samples.size > 1) {
-                val chartTop = h * .80f
-                val minV = samples.minOrNull() ?: 0f
-                val maxV = max(minV + .01f, samples.maxOrNull() ?: 1f)
+                val visibleSamples = samples.takeLast(90)
+                val minV = visibleSamples.minOrNull() ?: 0f
+                val maxV = max(minV + 0.01f, visibleSamples.maxOrNull() ?: 1f)
                 val path = Path()
-                val step = w / (samples.size - 1)
-                for (i in samples.indices) {
-                    val y = chartTop + h*.16f - ((samples[i] - minV)/(maxV-minV) * h*.14f)
-                    val x = i * step
+                val graphWidth = w - 28f
+                val step = graphWidth / (visibleSamples.size - 1).coerceAtLeast(1)
+                for (i in visibleSamples.indices) {
+                    val normalized = (visibleSamples[i] - minV) / (maxV - minV)
+                    val y = chartTop + h * 0.155f - normalized * h * 0.12f
+                    val x = 14f + i * step
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
-                drawPath(path, Green, style = Stroke(width = 2.5f))
+                drawPath(path, Color(0xFF48E7FF), style = Stroke(width = 2f))
             }
+
+            TextOnCanvas("LIVE CSI RADAR", Offset(14f, 23f), TextMain)
+            TextOnCanvas("ZONE A / ESTIMATED MAP", Offset(14f, 41f), TextDim)
+            TextOnCanvas(if (movement) "MOTION DETECTED" else "SCANNING", Offset(w - 144f, 23f), if (movement) Red else Green)
+            TextOnCanvas("$signalDbm dBm", Offset(w - 90f, 41f), TextDim)
+            TextOnCanvas("CSI SIGNAL TRACE", Offset(14f, chartTop + 14f), TextDim)
+            TextOnCanvas(if (movement) "ACTIVITY \${(score * 100).toInt()}%" else "MONITORING", Offset(14f, h - 10f), if (movement) Red else Green)
         }
     }
 }
