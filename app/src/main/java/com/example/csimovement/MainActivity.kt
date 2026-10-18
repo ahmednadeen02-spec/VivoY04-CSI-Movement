@@ -254,7 +254,7 @@ private fun SignalPanel(modifier: Modifier, signalDbm: Int) {
 
 @Composable
 private fun DarkCard(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = modifier, color = Panel, shape = RoundedCornerShape(14.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF16466F))) {
+    Surface(modifier = modifier, color = Panel, shape = RoundedCornerShape(14.dp)) {
         Column(Modifier.padding(9.dp), content = content)
     }
 }
