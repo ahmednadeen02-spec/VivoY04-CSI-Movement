@@ -47,6 +47,7 @@ fun CsiApp() {
     var movement by remember { mutableStateOf(false) }
     var score by remember { mutableFloatStateOf(0f) }
     var status by remember { mutableStateOf("SYSTEM READY") }
+    var demoPose by remember { mutableStateOf("STANDING") }
     var source by remember { mutableStateOf("Waiting for CSI signal") }
     var signalDbm by remember { mutableIntStateOf(-42) }
     val samples = remember { mutableStateListOf<Float>() }
@@ -79,8 +80,9 @@ fun CsiApp() {
         job = CoroutineScope(Dispatchers.Default).launch {
             val startAt = System.currentTimeMillis()
             while (isActive) {
-                val elapsed = (System.currentTimeMillis() - startAt) % 8000L
-                val moving = elapsed in 3500L..6999L
+                val elapsed = (System.currentTimeMillis() - startAt) % 12000L
+                val pose = when (elapsed) { in 0L..2999L -> "STANDING"; in 3000L..5999L -> "WALKING"; in 6000L..8999L -> "SITTING"; else -> "WALKING" }
+                val moving = pose != "STANDING"
                 val t = System.currentTimeMillis() / 1000.0
                 val wave = sin(t * 2.4) * 0.025
                 val v = if (moving) {
@@ -90,6 +92,8 @@ fun CsiApp() {
                 }
                 withContext(Dispatchers.Main) {
                     addSample(v)
+                    demoPose = pose
+                    status = if (demoMode) pose else status
                     signalDbm = -42 + Random.nextInt(-3, 4)
                 }
                 delay(80)
@@ -139,6 +143,7 @@ fun CsiApp() {
         job = null
         running = false
         demoMode = false
+        demoPose = "STANDING"
         movement = false
         score = 0f
         status = "SYSTEM READY"
@@ -162,9 +167,10 @@ fun CsiApp() {
                 }
                 Text("LIVE WI-FI DETECTION ZONE", color = TextMain, fontWeight = FontWeight.Bold)
                 RadarPanel(
-                    Modifier.fillMaxWidth().weight(1f).heightIn(min = 250.dp),
+                    Modifier.fillMaxWidth().weight(1f).heightIn(min = 210.dp),
                     movement, score, samples, signalDbm, demoMode
                 )
+                SkeletonDemoPanel(Modifier.fillMaxWidth().height(205.dp), demoPose, demoMode)
                 Text("MOVEMENT INTENSITY", color = TextMain, fontWeight = FontWeight.Bold)
                 LinearProgressIndicator(
                     progress = { score },
@@ -351,6 +357,69 @@ private fun RadarPanel(
             TextOnCanvas("$signalDbm dBm",Offset(w-90f,41f),TextDim)
             TextOnCanvas("CSI SIGNAL TRACE",Offset(14f,chartTop+14f),TextDim)
             TextOnCanvas(if(movement)"ACTIVITY ${(score*100).toInt()}%"else"MONITORING",Offset(14f,h-10f),if(movement)Red else Green)
+        }
+    }
+}
+
+@Composable
+private fun SkeletonDemoPanel(modifier: Modifier, pose: String, demoMode: Boolean) {
+    val transition = rememberInfiniteTransition(label = "skeleton-demo")
+    val swing by transition.animateFloat(-1f, 1f, infiniteRepeatable(tween(420, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "skeleton-swing")
+    val cyan = Color(0xFF35DFFF)
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF16466F))) {
+        Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Canvas(Modifier.weight(1f).fillMaxHeight()) {
+                val cx = size.width * .5f
+                val top = size.height * .10f
+                val unit = size.height * .19f
+                val shift = if (pose == "WALKING") swing * 8f else 0f
+                val head = Offset(cx, top + unit * .35f)
+                val neck = Offset(cx, top + unit * .75f)
+                val shoulderY = top + unit
+                val hipY = if (pose == "SITTING") top + unit * 2.2f else top + unit * 2.35f
+                val shoulderL = Offset(cx - 18f, shoulderY)
+                val shoulderR = Offset(cx + 18f, shoulderY)
+                val hipL = Offset(cx - 11f, hipY)
+                val hipR = Offset(cx + 11f, hipY)
+                fun bone(a: Offset, b: Offset, width: Float = 4f) {
+                    drawLine(cyan.copy(alpha=.25f), a, b, width+5f, cap=StrokeCap.Round)
+                    drawLine(cyan, a, b, width, cap=StrokeCap.Round)
+                    drawCircle(Color(0xFFB9FAFF), 3.5f, a)
+                    drawCircle(Color(0xFFB9FAFF), 3.5f, b)
+                }
+                drawCircle(cyan.copy(alpha=.2f), 18f, head)
+                drawCircle(cyan, 10f, head, style=Stroke(2.5f))
+                bone(head.copy(y=head.y+10f), neck)
+                bone(shoulderL, shoulderR)
+                bone(neck, Offset(cx, hipY))
+                if (pose == "SITTING") {
+                    bone(shoulderL, Offset(cx-26f, shoulderY+unit*.65f))
+                    bone(Offset(cx-26f, shoulderY+unit*.65f), Offset(cx-20f, hipY-unit*.2f))
+                    bone(shoulderR, Offset(cx+26f, shoulderY+unit*.65f))
+                    bone(Offset(cx+26f, shoulderY+unit*.65f), Offset(cx+20f, hipY-unit*.2f))
+                    bone(hipL, Offset(cx-20f, hipY+unit*.65f))
+                    bone(Offset(cx-20f, hipY+unit*.65f), Offset(cx+15f, hipY+unit*.65f))
+                    bone(hipR, Offset(cx+15f, hipY+unit*.65f))
+                } else {
+                    bone(shoulderL, Offset(cx-26f-shift, shoulderY+unit*.65f))
+                    bone(Offset(cx-26f-shift, shoulderY+unit*.65f), Offset(cx-22f-shift, shoulderY+unit*1.05f))
+                    bone(shoulderR, Offset(cx+26f+shift, shoulderY+unit*.65f))
+                    bone(Offset(cx+26f+shift, shoulderY+unit*.65f), Offset(cx+22f+shift, shoulderY+unit*1.05f))
+                    bone(hipL, Offset(cx-16f+shift, hipY+unit*.7f))
+                    bone(Offset(cx-16f+shift, hipY+unit*.7f), Offset(cx-22f-shift, hipY+unit*1.35f))
+                    bone(hipR, Offset(cx+16f-shift, hipY+unit*.7f))
+                    bone(Offset(cx+16f-shift, hipY+unit*.7f), Offset(cx+22f+shift, hipY+unit*1.35f))
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("HUMAN SKELETON", color = TextMain, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Text(if (demoMode) "SIMULATED DEMO" else "WAITING FOR DATA", color = TextDim, style = MaterialTheme.typography.labelSmall)
+                Surface(color = if (pose=="WALKING") Color(0xFF073F43) else Panel2, shape = RoundedCornerShape(10.dp), border = androidx.foundation.BorderStroke(1.dp, cyan.copy(alpha=.7f))) {
+                    Text(pose, Modifier.padding(horizontal=12.dp, vertical=8.dp), color=cyan, fontWeight=FontWeight.Bold)
+                }
+                Text(when(pose) { "SITTING" -> "Posture: seated"; "WALKING" -> "Motion: walking"; else -> "Posture: upright" }, color=TextMain, style=MaterialTheme.typography.bodySmall)
+                Text("Demo pose is animated, not measured from real CSI.", color=TextDim, style=MaterialTheme.typography.labelSmall)
+            }
         }
     }
 }
