@@ -415,7 +415,7 @@ private fun SkeletonDemoPanel(modifier: Modifier, pose: String, demoMode: Boolea
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("HUMAN SKELETON", color = TextMain, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
                 Text(if (demoMode) "SIMULATED DEMO" else "WAITING FOR DATA", color = TextDim, style = MaterialTheme.typography.labelSmall)
-                Surface(color = if (pose=="WALKING") Color(0xFF073F43) else Panel2, shape = RoundedCornerShape(10.dp), border = androidx.foundation.BorderStroke(1.dp, cyan.copy(alpha=.7f))) {
+                Surface(color = if (pose=="WALKING") Color(0xFF073F43) else Panel2, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, cyan.copy(alpha=.7f))) {
                     Text(pose, Modifier.padding(horizontal=12.dp, vertical=8.dp), color=cyan, fontWeight=FontWeight.Bold)
                 }
                 Text(when(pose) { "SITTING" -> "Posture: seated"; "WALKING" -> "Motion: walking"; else -> "Posture: upright" }, color=TextMain, style=MaterialTheme.typography.bodySmall)
