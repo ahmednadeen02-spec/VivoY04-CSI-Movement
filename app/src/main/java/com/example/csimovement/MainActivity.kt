@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -201,7 +202,7 @@ private fun Header(running: Boolean) {
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = Panel,
-            border = androidx.compose.foundation.BorderStroke(1.dp, if (running) Green else Cyan)
+            border = BorderStroke(1.dp, if (running) Green else Cyan)
         ) {
             Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("●", color = if (running) Green else TextDim, fontWeight = FontWeight.Bold)
@@ -366,7 +367,7 @@ private fun SkeletonDemoPanel(modifier: Modifier, pose: String, demoMode: Boolea
     val transition = rememberInfiniteTransition(label = "skeleton-demo")
     val swing by transition.animateFloat(-1f, 1f, infiniteRepeatable(tween(420, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "skeleton-swing")
     val cyan = Color(0xFF35DFFF)
-    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF16466F))) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Panel), border = BorderStroke(1.dp, Color(0xFF16466F))) {
         Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Canvas(Modifier.weight(1f).fillMaxHeight()) {
                 val cx = size.width * .5f
