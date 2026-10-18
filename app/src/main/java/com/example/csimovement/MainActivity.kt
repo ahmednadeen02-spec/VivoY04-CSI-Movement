@@ -294,14 +294,34 @@ private fun RadarPanel(
             drawLine(marker, Offset(w-inset,inset), Offset(w-inset-corner,inset), 2.5f); drawLine(marker, Offset(w-inset,inset), Offset(w-inset,inset+corner), 2.5f)
             drawLine(marker, Offset(inset,h-inset), Offset(inset+corner,h-inset), 2.5f); drawLine(marker, Offset(inset,h-inset), Offset(inset,h-inset-corner), 2.5f)
             drawLine(marker, Offset(w-inset,h-inset), Offset(w-inset-corner,h-inset), 2.5f); drawLine(marker, Offset(w-inset,h-inset), Offset(w-inset,h-inset-corner), 2.5f)
-            for (i in 1..5) drawCircle(Color(0xFF1C5275).copy(alpha = 0.85f - i * 0.09f), maxR * i / 5f, Offset(bodyX, bodyY), style = Stroke(1.25f))
+            // Layered sonar rings with a breathing pulse for a more cinematic CCTV display.
+            for (i in 1..6) {
+                val ringPulse = ((scanPhase + i * 0.13f) % 1f)
+                val ringRadius = maxR * (0.18f + ringPulse * 0.82f)
+                drawCircle(
+                    Color(0xFF20CFFF).copy(alpha = (1f - ringPulse) * if (movement) 0.34f else 0.20f),
+                    ringRadius,
+                    Offset(bodyX, bodyY),
+                    style = Stroke(if (i == 1) 2f else 1.15f)
+                )
+            }
+            for (i in 1..5) drawCircle(Color(0xFF1C5275).copy(alpha = 0.70f - i * 0.07f), maxR * i / 5f, Offset(bodyX, bodyY), style = Stroke(1.1f))
             val sweepAngle = scanPhase * 360f
             drawArc(brush = Brush.sweepGradient(listOf(Color.Transparent, Color(0x4430C8FF), Color(0x8830C8FF)), center = Offset(bodyX, bodyY)), startAngle = sweepAngle, sweepAngle = 48f, useCenter = true, topLeft = Offset(bodyX-maxR, bodyY-maxR), size = Size(maxR*2f,maxR*2f))
             val rayAngle = Math.toRadians(sweepAngle.toDouble())
             drawLine(Color(0xFF36D8FF).copy(alpha = .9f), Offset(bodyX,bodyY), Offset(bodyX+cos(rayAngle).toFloat()*maxR,bodyY+sin(rayAngle).toFloat()*maxR), 2f)
             val heatAlpha = (0.10f + score.coerceIn(0f,1f)*0.42f).coerceIn(.10f,.52f)
             val heatColor = if (movement) Color(0xFFFF3D5A) else Color(0xFF00D9FF)
-            drawCircle(heatColor.copy(alpha=heatAlpha*.24f),maxR*.70f,Offset(bodyX,bodyY)); drawCircle(heatColor.copy(alpha=heatAlpha*.34f),maxR*.47f,Offset(bodyX,bodyY)); drawCircle(heatColor.copy(alpha=heatAlpha*.44f),maxR*.24f,Offset(bodyX,bodyY))
+            drawCircle(heatColor.copy(alpha=heatAlpha*.16f),maxR*.70f,Offset(bodyX,bodyY)); drawCircle(heatColor.copy(alpha=heatAlpha*.25f),maxR*.47f,Offset(bodyX,bodyY)); drawCircle(heatColor.copy(alpha=heatAlpha*.34f),maxR*.24f,Offset(bodyX,bodyY))
+            // Glowing target reticle and four tracking ticks around the detected zone.
+            val reticleR = maxR * 0.30f
+            drawCircle(heatColor.copy(alpha = if (movement) 0.65f else 0.35f), reticleR, Offset(bodyX, bodyY), style = Stroke(1.5f))
+            for (tick in 0..3) {
+                val a = Math.toRadians((scanPhase * 360f + tick * 90f).toDouble())
+                val inner = reticleR + 5f
+                val outer = inner + 9f
+                drawLine(Color(0xFF75EDFF).copy(alpha = 0.85f), Offset(bodyX + cos(a).toFloat() * inner, bodyY + sin(a).toFloat() * inner), Offset(bodyX + cos(a).toFloat() * outer, bodyY + sin(a).toFloat() * outer), 2f)
+            }
             // The body is a stylized visualization; movement data cannot reconstruct a camera-quality image.
             val bob = if (movement) step * 5f * motionAmount else sin(scanPhase * 6.28318f) * 0.6f
             val armSwing = if (movement) step * 0.45f * motionAmount else 0.02f
@@ -309,7 +329,9 @@ private fun RadarPanel(
             val boxW = w*.20f; val boxH = h*.40f; val boxTop = bodyY-h*.24f+bob
             drawRoundRect(waveColor.copy(alpha=if(movement) .98f else .52f),Offset(bodyX-boxW/2f,boxTop),Size(boxW,boxH),androidx.compose.ui.geometry.CornerRadius(8f,8f),style=Stroke(if(movement) 2.5f else 1.5f))
             val head = Offset(bodyX, bodyY-h*.14f+bob); val headR=h*.035f
+            drawCircle(waveColor.copy(alpha = if (movement) 0.14f else 0.07f), headR * 2.3f, head)
             drawCircle(Color(0xFF06111E),headR,head); drawCircle(waveColor,headR,head,style=Stroke(2.5f))
+            drawCircle(waveColor.copy(alpha = 0.75f), headR * 0.22f, head)
             val shoulderY=bodyY-h*.06f+bob; val hipY=bodyY+h*.10f+bob
             drawLine(waveColor,Offset(bodyX,shoulderY),Offset(bodyX,hipY),h*.022f,cap=StrokeCap.Round)
             drawLine(waveColor,Offset(bodyX,shoulderY),Offset(bodyX-w*.065f+armSwing*14f,bodyY+h*.025f+bob),h*.018f,cap=StrokeCap.Round)
